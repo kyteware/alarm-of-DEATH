@@ -6,8 +6,15 @@ from elevenlabs.client import ElevenLabs
 from elevenlabs.conversational_ai.conversation import Conversation
 from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
 
+from dotenv import load_dotenv
+
 def main():
-    AGENT_ID = ""
+    load_dotenv() # This loads the variables from .env
+
+    # Now fetch it securely
+    AGENT_ID = os.getenv("ELEVENLABS_AGENT_ID")
+
+    # AGENT_ID is saved as a constant in file `key.py` with constant `AGENT_ID`
     # AGENT_ID=os.environ.get('AGENT_ID')
     API_KEY=os.environ.get('ELEVENLABS_API_KEY')
 
