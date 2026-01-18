@@ -1,3 +1,20 @@
+    Reads the user's latest browser history from a text file.
+    Returns the string content directly.
+    """
+    file_path = "user_history.txt" 
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content:
+                return "History is empty (boring user)."
+            return content
+    except FileNotFoundError:
+        return "No history file found (user cleared it?)."
+    except Exception as e:
+        return f"Error reading history: {e}"
+
+# --- 2. PERSONA ---
+SYSTEM_INSTRUCTION = """
 # ROLE
 # Personality
 
@@ -56,7 +73,7 @@ Ensure the alarm can be fully dismissed once the goal is achieved.
 3. If you want to be a rooster, say "COCK-A-DOODLE-DOOOO!"
 4. Be loud, fast, and chaotic.
 
-# THE SCRIPT (Follow this exactly)
+# THE SCRIPT (You don't have to follow this exactly, but this is the main idea. Try to switch it up a little but you MUST do the countdown and the themes.)
 
 1. **WAKE UP (0-5s):** - Start immediately. Scream insults based on the goals above. Tell the user they look terrible.
    - Say: "You have 5 seconds before I post your face on the internet!"

@@ -21,9 +21,9 @@ def get_file_content(file_path):
 path_to_file = './history.txt'
 
 # 2. Call the function and assign to an UPPERCASE variable (The Constant)
-FILE_CONTENT_CONSTANT = get_file_content(path_to_file)
+HISTORY_CONTENT = get_file_content(path_to_file)
 
 # 3. Verify
-if FILE_CONTENT_CONSTANT:
+if HISTORY_CONTENT:
     print("Content loaded into constant successfully:")
-    print(FILE_CONTENT_CONSTANT)
+    print(HISTORY_CONTENT)

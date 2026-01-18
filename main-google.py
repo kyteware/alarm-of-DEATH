@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-from read_history_text import FILE_CONTENT_CONSTANT
+#from Scripts.search_history import fetch_history
 
 load_dotenv()
 
@@ -23,7 +23,26 @@ MODEL_ID = "gemini-2.0-flash-exp"
 logging.getLogger('websockets').setLevel(logging.ERROR)
 logging.getLogger('asyncio').setLevel(logging.ERROR)
 
-# 1. PERSONA: Energetic Alarm Clock
+# --- 1. HELPER FUNCTION (Called locally by Python) ---
+def fetch_history():
+    """
+    Reads the user's latest browser history from a text file.
+    Returns the string content directly.
+    """
+
+    file_path = "./history.txt" 
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content:
+                return "History is empty (boring user)."
+            return content
+    except FileNotFoundError:
+        return "No history file found (user cleared it?)."
+    except Exception as e:
+        return f"Error reading history: {e}"
+
+# --- 2. PERSONA ---
 SYSTEM_INSTRUCTION = """
 # ROLE
 # Personality
@@ -83,7 +102,7 @@ Ensure the alarm can be fully dismissed once the goal is achieved.
 3. If you want to be a rooster, say "COCK-A-DOODLE-DOOOO!"
 4. Be loud, fast, and chaotic.
 
-# THE SCRIPT (Follow this exactly)
+# THE SCRIPT (You don't have to follow this exactly, but this is the main idea. Try to switch it up a little but you MUST do the countdown and the themes.)
 
 1. **WAKE UP (0-5s):** - Start immediately. Scream insults based on the goals above. Tell the user they look terrible.
    - Say: "You have 5 seconds before I post your face on the internet!"
@@ -96,7 +115,6 @@ Ensure the alarm can be fully dismissed once the goal is achieved.
 3. **THE AFTERMATH:**
    - Wait for the system to tell you the photo is taken.
    - Once confirmed, LAUGH maniacally and mock the user about the photo.
-
 """
 
 FORMAT = pyaudio.paInt16
@@ -108,125 +126,91 @@ CHUNK = 2048
 class AppState:
     def __init__(self):
         self.ai_is_speaking = False
-        self.photo_taken = False # Track if we have already snapped the pic
+        self.photo_taken = False 
 
-# --- FUNCTION: The actual "Camera" logic ---
 def take_image():
     print("\n" + "*"*40, flush=True)
     print("📸 📸 SNAP! CAMERA FLASH FIRED! 📸 📸", flush=True)
-    print("   (Image captured and saved)   ", flush=True)
     print("*"*40 + "\n", flush=True)
     return "Image captured successfully."
 
-# --- FUNCTION: Initial Beep ---
 async def play_initial_alarm(stream):
-    print("⏰ ALARM TRIGGERED! (Playing digital beep...)", flush=True)
+    print("⏰ ALARM TRIGGERED!", flush=True)
     frequency = 800
-    duration_ms = 150
-    volume = 0.2
-    
-    num_samples = int(OUTPUT_RATE * (duration_ms / 1000.0))
-    audio_data = bytearray()
-    fade_len = int(num_samples * 0.1)
-
-    for x in range(num_samples):
-        fade = 1.0
-        if x < fade_len:
-            fade = x / fade_len
-        elif x > num_samples - fade_len:
-            fade = (num_samples - x) / fade_len
-            
-        sample = (volume * fade) * 32767.0 * math.sin(2.0 * math.pi * frequency * x / OUTPUT_RATE)
-        audio_data.extend(struct.pack('<h', int(sample)))
-    
-    beep_bytes = bytes(audio_data)
-    silence = b'\x00' * int(len(beep_bytes) / 2) 
-
     for _ in range(3):
-        await asyncio.to_thread(stream.write, beep_bytes)
-        await asyncio.to_thread(stream.write, silence)
+        audio_data = bytearray()
+        for x in range(int(OUTPUT_RATE * 0.15)):
+            sample = 0.2 * 32767.0 * math.sin(2.0 * math.pi * frequency * x / OUTPUT_RATE)
+            audio_data.extend(struct.pack('<h', int(sample)))
+        await asyncio.to_thread(stream.write, bytes(audio_data))
+        await asyncio.to_thread(stream.write, b'\x00' * len(audio_data))
 
-# --- FUNCTION: Run a Single Session ---
 async def run_session(client, mic_stream, speaker_stream, app_state, config):
     print("\n⚡ Connecting to Gemini...", flush=True)
     
     async with client.aio.live.connect(model=MODEL_ID, config=config) as session:
-        print("✅ Connected! (AI will speak first)", flush=True)
+        print("✅ Connected!", flush=True)
         
-        # Kickstart the bot
-        await session.send(input="The digital alarm finished. Start the insults and the 5-second countdown NOW.", end_of_turn=True)
+        # Initial trigger
+        await session.send(input="Start the alarm insults and the countdown now!", end_of_turn=True)
         
         async def send_audio():
             try:
                 while True:
                     data = await asyncio.to_thread(mic_stream.read, CHUNK, exception_on_overflow=False)
-                    if app_state.ai_is_speaking:
-                        continue
+                    if app_state.ai_is_speaking: continue
                     await session.send_realtime_input(
-                        media=types.Blob(
-                            data=data,
-                            mime_type="audio/pcm;rate=16000"
-                        )
+                        media=types.Blob(data=data, mime_type="audio/pcm;rate=16000")
                     )
-            except asyncio.CancelledError:
-                pass
-            except Exception as e:
-                print(f"Error in send_audio: {e}", flush=True)
-                raise e
+            except asyncio.CancelledError: pass
 
         async def receive_audio():
             try:
                 while True:
                     async for message in session.receive():
                         server_content = message.server_content
-                        
-                        if server_content is None:
-                            continue
+                        if server_content is None: continue
 
+                        # 1. Output Audio
                         if server_content.model_turn:
                             for part in server_content.model_turn.parts:
                                 if part.inline_data:
                                     app_state.ai_is_speaking = True
                                     await asyncio.to_thread(speaker_stream.write, part.inline_data.data)
 
-                        # --- HERE IS THE MAGIC LOGIC ---
+                        # 2. Handle Turn Completion (The Logic Gate)
                         if server_content.turn_complete:
                             app_state.ai_is_speaking = False
                             
-                            # If the AI finished speaking and we haven't taken the photo yet, DO IT.
+                            # If we haven't taken the photo yet, do it now
                             if not app_state.photo_taken:
-                                print("\n🤐 AI finished speaking (Countdown complete).", flush=True)
+                                print("\n🤐 Countdown complete.", flush=True)
                                 
-                                # 1. Execute Function Locally
+                                # A. Take Photo
                                 take_image()
                                 app_state.photo_taken = True
                                 
-                                # 2. Tell the AI we did it, so it can react (The Aftermath)
-                                print("   (Notifying AI to roast user...)", flush=True)
-                                await session.send(input="SYSTEM: Photo taken successfully. Roast the user now!", end_of_turn=True)
+                                # B. Read History LOCALLY
+                                history_text = fetch_history()
+                                print(f"   (Reading history file... Found: '{history_text[:20]}...')", flush=True)
+
+                                # C. Send it all to the AI in one prompt
+                                roast_prompt = (
+                                    "SYSTEM: Photo taken successfully. "
+                                    f"I also scanned their browser history: '{history_text}'. "
+                                    "Now LAUGH at them and roast them about this specific history!"
+                                )
                                 
-            except asyncio.CancelledError:
-                pass
-            except Exception as e:
-                print(f"Error in receive_audio: {e}", flush=True)
-                raise e
-            finally:
-                app_state.ai_is_speaking = False
+                                await session.send(input=roast_prompt, end_of_turn=True)
+
+            except asyncio.CancelledError: pass
+            finally: app_state.ai_is_speaking = False
 
         send_task = asyncio.create_task(send_audio())
         receive_task = asyncio.create_task(receive_audio())
         
-        done, pending = await asyncio.wait(
-            [send_task, receive_task], 
-            return_when=asyncio.FIRST_EXCEPTION
-        )
-        
-        for task in pending:
-            task.cancel()
-        
-        for task in done:
-            if task.exception():
-                raise task.exception()
+        done, pending = await asyncio.wait([send_task, receive_task], return_when=asyncio.FIRST_EXCEPTION)
+        for task in pending: task.cancel()
 
 async def main():
     use_vertex = os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "True").lower() == "true"
@@ -235,29 +219,12 @@ async def main():
     p = pyaudio.PyAudio()
     app_state = AppState()
     
-    mic_stream = p.open(
-        format=FORMAT,
-        channels=CHANNELS,
-        rate=INPUT_RATE,
-        input=True,
-        frames_per_buffer=CHUNK,
-    )
-    
-    speaker_stream = p.open(
-        format=FORMAT,
-        channels=CHANNELS,
-        rate=OUTPUT_RATE,
-        output=True,
-        frames_per_buffer=CHUNK,
-    )
-
-    print(f"Starting session...", flush=True)
+    mic_stream = p.open(format=FORMAT, channels=CHANNELS, rate=INPUT_RATE, input=True, frames_per_buffer=CHUNK)
+    speaker_stream = p.open(format=FORMAT, channels=CHANNELS, rate=OUTPUT_RATE, output=True, frames_per_buffer=CHUNK)
 
     await play_initial_alarm(speaker_stream)
     
-    print("Speak ONLY when the AI is silent. (Ctrl+C to stop)", flush=True)
-
-    # We removed the 'tools' definition because we are handling it manually now
+    # Simplified config - NO TOOLS
     config = {
         "response_modalities": ["AUDIO"],
         "system_instruction": types.Content(parts=[types.Part(text=SYSTEM_INSTRUCTION)]),
@@ -267,17 +234,10 @@ async def main():
         try:
             await run_session(client, mic_stream, speaker_stream, app_state, config)
         except Exception as e:
-            print(f"\n⚠️ Session interrupted: {e}", flush=True)
-            print("♻️  Reconnecting in 1 second...", flush=True)
+            print(f"Error: {e}")
             await asyncio.sleep(1)
         except KeyboardInterrupt:
-            print("\nGoodbye!", flush=True)
             break
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\nStopping...", flush=True)
-    except Exception as e:
-        print(f"Main error: {e}", flush=True)
+    asyncio.run(main())
