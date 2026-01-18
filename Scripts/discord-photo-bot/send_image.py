@@ -1,7 +1,9 @@
 import os
 import requests
 import random
+import json
 from dotenv import load_dotenv
+import cv2
 
 # Load environment variables
 load_dotenv()
@@ -36,24 +38,34 @@ if not TOKEN or not CHANNEL_ID:
     print("Error: DISCORD_TOKEN or CHANNEL_ID not found in .env file.")
     exit(1)
 
-def send_image(image_url, message_text="Wake up!"):
+def send_image(image_path, message_text="Wake up!"):
     url = f"https://discord.com/api/v10/channels/{CHANNEL_ID}/messages"
     
     headers = {
-        "Authorization": f"Bot {TOKEN}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bot {TOKEN}"
     }
     
+    # Select just the filename from the path
+    filename = os.path.basename(image_path)
+    
+    # To send a local file with an embed, we upload the file as an attachment
+    # and reference it in the embed using `attachment://filename.png`
     payload = {
         "content": message_text,
         "embeds": [{
             "image": {
-                "url": image_url
+                "url": f"attachment://{filename}"
             }
         }]
     }
     
-    response = requests.post(url, headers=headers, json=payload)
+    with open(image_path, "rb") as f:
+        files = {
+            "file": (filename, f),
+            "payload_json": (None, json.dumps(payload))
+        }
+        
+        response = requests.post(url, headers=headers, files=files)
     
     if response.status_code == 200 or response.status_code == 201:
         print("Image sent successfully!")
@@ -61,13 +73,47 @@ def send_image(image_url, message_text="Wake up!"):
         print(f"Failed to send image. Status Code: {response.status_code}")
         print(response.text)
 
+def take_image():
+    cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+    if not cam.isOpened():
+        print("Error: Could not open camera.")
+        exit()
+
+    print("Press 'Space' to take a photo, or 'Esc' to exit.")
+
+    while True:
+        # 2. Capture frame-by-frame for the live preview
+        ret, frame = cam.read()
+
+        if not ret:
+            print("failed to grab frame")
+            break
+
+        img_name = "captured_image.png"
+        cv2.imwrite(img_name, frame)
+        print(f"Captured! Saved as {img_name}")
+        
+        # At this point, the variable 'frame' is your image 
+        # usable as a NumPy array.
+        print(f"Image shape: {frame.shape}") 
+        break
+
+    # 4. Cleanup
+    cam.release()
+    cv2.destroyAllWindows()
+
 if __name__ == "__main__":
     # Example usage
+    take_image()
 
     # Select one message randomly from the list
     random_message = random.choice(wake_up_messages)
 
-    image_url = "https://picsum.photos/400/300" 
-    send_image(image_url, random_message)
+    image_path = "captured_image.png" 
+    send_image(image_path, random_message)
+
+
+
 
 
