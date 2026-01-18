@@ -18,7 +18,7 @@ def get_file_content(file_path):
 # --- Usage ---
 
 # 1. Define the file path
-path_to_file = './history.txt'
+path_to_file = 'history.txt'
 
 # 2. Call the function and assign to an UPPERCASE variable (The Constant)
 HISTORY_CONTENT = get_file_content(path_to_file)

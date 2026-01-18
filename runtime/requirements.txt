@@ -4,5 +4,10 @@ python-dotenv
 pyserial
 flask
 requests
-opencv
+opencv-python
 pynacl
+os
+random
+json
+time
+cv2
