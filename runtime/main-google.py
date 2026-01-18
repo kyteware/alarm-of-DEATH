@@ -182,7 +182,7 @@ CHUNK = 2048
 
 class AppState:
     def __init__(self):
-        self.ai_is_speaking = False
+        self.ai_is_speaking = True
 
 async def play_initial_alarm(stream):
     print("⏰ ALARM TRIGGERED!", flush=True)
@@ -208,11 +208,13 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
         # Initial trigger
         await session.send(input="Start the alarm now!", end_of_turn=True)
         
+
         async def send_audio():
             try:
                 while True:
                     data = await asyncio.to_thread(mic_stream.read, CHUNK, exception_on_overflow=False)
                     if app_state.ai_is_speaking: continue
+                    print("sending our audio")
                     await session.send_realtime_input(
                         media=types.Blob(data=data, mime_type="audio/pcm;rate=16000")
                     )
@@ -231,6 +233,9 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
                         if server_content and server_content.model_turn:
                             for part in server_content.model_turn.parts:
                                 if part.inline_data:
+                                    if not app_state.ai_is_speaking:
+                                       print(f"   [DEBUG] AI started speaking. ai_is_speaking was {app_state.ai_is_speaking}", flush=True)
+
                                     app_state.ai_is_speaking = True
                                     await asyncio.to_thread(speaker_stream.write, part.inline_data.data)
 
@@ -245,26 +250,47 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
 
                         # 3. Handle Turn Completion
                         if server_content and server_content.turn_complete:
+                            if app_state.ai_is_speaking:
+                                print(f"   [DEBUG] Turn complete. ai_is_speaking was {app_state.ai_is_speaking}", flush=True)
+
                             app_state.ai_is_speaking = False
+                            # Flush input buffer to prevent self-interruption
+                            if mic_stream.get_read_available() > 0:
+                                mic_stream.read(mic_stream.get_read_available(), exception_on_overflow=False)
                             if tool_to_run and tool_to_run in tools_map:
+                                print(f"   [DEBUG] executing deferred tool {tool_to_run}", flush=True)
+                                
+                                # -----------------------------------------------------
+                                # PAUSE MIC while executing tool + sending response
+                                # -----------------------------------------------------
+                                app_state.ai_is_speaking = True  
+
                                 # Execute the tool
                                 result = tools_map[tool_to_run]()
                                 
                                 # Send response back to model
-                                await session.send(
-                                    input=types.LiveClientToolResponse(
-                                        function_responses=[
-                                            types.FunctionResponse(
-                                                name=tool_to_run,
-                                                id=tool_call_id,
-                                                response={"result": result}
-                                            )
-                                        ]
-                                    )
-                                )
+                                # await session.send(
+                                #     input=types.LiveClientToolResponse(
+                                #         function_responses=[
+                                #             types.FunctionResponse(
+                                #                 name=tool_to_run,
+                                #                 id=tool_call_id,
+                                #                 response={"result": result}
+                                #             )
+                                #         ]
+                                #     )
+                                # )
                                 # Reset for next turn
                                 tool_to_run = None
                                 tool_call_id = None
+                                
+                                # -----------------------------------------------------
+                                # RESUME MIC
+                                # -----------------------------------------------------
+                                app_state.ai_is_speaking = False
+                                # Flush again just to be safe
+                                if mic_stream.get_read_available() > 0:
+                                    mic_stream.read(mic_stream.get_read_available(), exception_on_overflow=False)
                             else:
                                 if tool_to_run:
                                     print(f"   [ERROR] Unknown or unhandled tool: {tool_to_run}")
