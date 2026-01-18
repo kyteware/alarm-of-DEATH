@@ -5,3 +5,4 @@ history.txt
 captured_image.png
 .archive/captured_image.png
 .archive/history.txt
+*/.venv
