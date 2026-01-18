@@ -168,13 +168,15 @@ class AppState:
 async def play_initial_alarm(stream):
     print("⏰ ALARM TRIGGERED!", flush=True)
     frequency = 800
-    for _ in range(3):
-        audio_data = bytearray()
-        for x in range(int(OUTPUT_RATE * 0.15)):
-            sample = 0.2 * 32767.0 * math.sin(2.0 * math.pi * frequency * x / OUTPUT_RATE)
-            audio_data.extend(struct.pack('<h', int(sample)))
-        await asyncio.to_thread(stream.write, bytes(audio_data))
-        await asyncio.to_thread(stream.write, b'\x00' * len(audio_data))
+    for i in range(3):
+        for j in range(4):
+            audio_data = bytearray()
+            for x in range(int(OUTPUT_RATE * 0.15)):
+                sample = 0.2 * 32767.0 * math.sin(2.0 * math.pi * frequency * x / OUTPUT_RATE)
+                audio_data.extend(struct.pack('<h', int(sample)))
+            await asyncio.to_thread(stream.write, bytes(audio_data))
+            await asyncio.to_thread(stream.write, b'\x00' * len(audio_data))
+        await asyncio.sleep(0.5)
 
 tool_to_run = "NONE"
 
