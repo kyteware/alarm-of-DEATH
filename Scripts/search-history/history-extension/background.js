@@ -1,4 +1,4 @@
-const POLL_INTERVAL_MS = 3000;
+const PUSH_INTERVAL_MS = 10000;
 
 // Fetch browser history and send to Python
 function exportHistory() {
@@ -15,35 +15,17 @@ function exportHistory() {
         lastVisitTime: item.lastVisitTime,
       }));
 
+      // Send to history server (test.py) on port 5000
       fetch("http://localhost:5000/history", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(simplified),
       })
-        .then(() => {
-          // Tell Python we're done
-          fetch("http://localhost:5000/reset", { method: "POST" });
-        })
-        .catch((err) => console.error("Send failed:", err));
+        .then(() => console.log("History sent successfully"))
+        .catch((err) => console.error("Send failed (is test.py running?):", err));
     }
   );
 }
 
-// Poll Python for trigger signal
-function pollTrigger() {
-  chrome.runtime.getPlatformInfo(() => {});
-
-  fetch("http://localhost:5000/trigger")
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.run === true) {
-        exportHistory();
-      }
-    })
-    .catch(() => {
-      // Python not running yet — silently retry
-    });
-}
-
-// Start polling automatically
-setInterval(pollTrigger, POLL_INTERVAL_MS);
+// Push history automatically
+setInterval(exportHistory, PUSH_INTERVAL_MS);

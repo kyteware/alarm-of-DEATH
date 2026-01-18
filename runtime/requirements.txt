@@ -2,3 +2,7 @@ google-genai
 pyaudio
 python-dotenv
 pyserial
+flask
+requests
+opencv
+pynacl
