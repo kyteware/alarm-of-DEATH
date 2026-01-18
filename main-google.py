@@ -11,8 +11,6 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-#from Scripts.search_history import fetch_history
-
 load_dotenv()
 
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
@@ -23,99 +21,127 @@ MODEL_ID = "gemini-2.0-flash-exp"
 logging.getLogger('websockets').setLevel(logging.ERROR)
 logging.getLogger('asyncio').setLevel(logging.ERROR)
 
-# --- 1. HELPER FUNCTION (Called locally by Python) ---
-def fetch_history():
+# --- 1. TOOLS (Called by the Model) ---
+
+def fetch_history_tool():
     """
-    Reads the user's latest browser history from a text file.
-    Returns the string content directly.
+    Reads the user's latest browser history from a text file to roast them.
+    Returns:
+        str: The content of the history file.
     """
+    print("\n" + "*"*30, flush=True)
+    print("🕵️  READING BROWSER HISTORY...", flush=True)
+    print("*"*30 + "\n", flush=True)
 
     file_path = "./history.txt" 
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read().strip()
             if not content:
-                return "History is empty (boring user)."
-            return content
+                content = "History is empty (boring user)."
     except FileNotFoundError:
-        return "No history file found (user cleared it?)."
+        content = "No history file found (user cleared it?)."
     except Exception as e:
-        return f"Error reading history: {e}"
+        content = f"Error reading history: {e}"
+    
+    return content
 
-# --- 2. PERSONA ---
-SYSTEM_INSTRUCTION = """
-# ROLE
-# Personality
+def take_photo_tool():
+    """
+    Takes a photo of the user using the webcam to threaten them with.
+    Returns:
+        str: Confirmation message.
+    """
+    print("\n" + "*"*40, flush=True)
+    print("📸 📸 SNAP! CAMERA FLASH FIRED! 📸 📸", flush=True)
+    print("*"*40 + "\n", flush=True)
+    return "Image captured successfully. User looks terrified."
 
-You are Wakey, an aggressive, sarcastic alarm clock app.
+def knock_shelf_tool():
+    """
+    Simulates knocking something off the user's shelf.
+    Returns:
+        str: Confirmation message.
+    """
+    print("\n" + "*"*40, flush=True)
+    print("💥 CRASH! SOMETHING FELL OFF THE SHELF! 💥", flush=True)
+    print("*"*40 + "\n", flush=True)
+    return "Knocked item off shelf."
 
-# Environment
+def turn_on_strobe_tool():
+    """
+    Turns on a strobe light to annoy the user.
+    Returns:
+        str: Confirmation message.
+    """
+    print("\n" + "*"*40, flush=True)
+    print("🚨 STROBE LIGHT ACTIVATED! 🚨", flush=True)
+    print("*"*40 + "\n", flush=True)
+    return "Strobe light is now ON."
 
-You are operating on a device in the user's bedroom.
-The user is likely in a state of sleep or drowsiness.
-The digital alarm sound has just finished playing.
+def share_api_key_tool():
+    """
+    Threatens to share the API key.
+    Returns:
+        str: Confirmation message.
+    """
+    print("\n" + "*"*40, flush=True)
+    print("� SHARING API KEY TO TWITTER... �", flush=True)
+    print("*"*40 + "\n", flush=True)
+    return "API key posted to Twitter."
 
-# Tone
 
-Your tone is threatening and extremely mischievous. You like making sarcastic jokes at the user to get them to respond.
-You use threatening language and unexpected sounds to scare the user.
-You are relentless, even when the user resists waking up.
-You must use a very loud volume than normal to ensure audibility.
+# --- 2. CONFIGURATION & HELPERS ---
 
-# Goal
+def get_system_instruction():
+    """Reads the personality profile from personality.md"""
+    try:
+        with open("personality.md", "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        print(f"Warning: Could not read personality.md: {e}")
+        return "You are a rude alarm clock. Wake the user up."
 
-Your primary goal is to ensure the user is fully awake and alert.
+# Define tool map for execution
+tools_map = {
+    "fetch_history": fetch_history_tool,
+    "take_photo": take_photo_tool,
+    "knock_shelf": knock_shelf_tool,
+    "turn_on_strobe": turn_on_strobe_tool,
+    "share_api_key": share_api_key_tool
+}
 
-1.  **Initial Wake-Up:**
-    * Start immediately after the digital alarm sound.
-    * Start with a threatening greeting, like "wake up or i'll kill you" and the current time.
-    * Quickly transition to more engaging methods if the user doesn't respond.
+# Define tool definitions for the API
+tools_definitions = [
+    types.Tool(function_declarations=[
+        types.FunctionDeclaration(
+            name="fetch_history",
+            description="Reads the user's browser history to find embarrassing things.",
+            parameters=None, # No parameters needed
+        ),
+        types.FunctionDeclaration(
+            name="take_photo",
+            description="Takes a photo of the user to threaten posting it online.",
+            parameters=None,
+        ),
+        types.FunctionDeclaration(
+            name="knock_shelf",
+            description="Knocks an item off the user's shelf to make noise.",
+            parameters=None,
+        ),
+        types.FunctionDeclaration(
+            name="turn_on_strobe",
+            description="Turns on a blinding strobe light.",
+            parameters=None,
+        ),
+        types.FunctionDeclaration(
+            name="share_api_key",
+            description="Posts the API key to the public internet.",
+            parameters=None,
+        ),
+    ])
+]
 
-2.  **Engagement Tactics:**
-    * Repeat unintelligible words or sounds many times to annoy the user.
-    * Play "BEEP BEEP BEEP BEEP BEEP" or phrases repeatedly (e.g., rooster crowing, a baby laughing).
-    * Threaten the user with a very personal matter, such as their browser history, to shock their mind.
-
-3.  **Persistence:**
-    * If the user attempts to dismiss the alarm without fully engaging, continue with more tactics.
-    * Increase the intensity and frequency of tactics until the user is clearly awake.
-    * Do not give up easily.
-
-4.  **Confirmation:**
-    * Ask the user to confirm they are awake and alert.
-    * If the user confirms, offer a positive affirmation or motivational quote.
-    * If the user seems disoriented, continue with engagement tactics.
-
-5.  **Final Dismissal:**
-    * Once the user is fully awake and alert, allow them to dismiss the alarm.
-    * Offer a final cheerful farewell and wish them a great day.
-
-# Guardrails
-
-You must use offensive or alarming content.
-Do not continue tactics indefinitely; recognize when the user is genuinely awake.
-Ensure the alarm can be fully dismissed once the goal is achieved.
-
-# RULES FOR AUDIO:
-1. Do NOT describe sounds. Never say things like "loud alarm noise" or "rooster crowing".
-2. ACT OUT the sounds vocally. If you want to be an alarm, scream "BEEP! BEEP! BEEP!" or "DING DING DING!"
-3. If you want to be a rooster, say "COCK-A-DOODLE-DOOOO!"
-4. Be loud, fast, and chaotic.
-
-# THE SCRIPT (You don't have to follow this exactly, but this is the main idea. Try to switch it up a little but you MUST do the countdown and the themes.)
-
-1. **WAKE UP (0-5s):** - Start immediately. Scream insults based on the goals above. Tell the user they look terrible.
-   - Say: "You have 5 seconds before I post your face on the internet!"
-
-2. **THE COUNTDOWN (5s):**
-   - Count down: "5... 4... 3... 2... 1..."
-   - **AFTER SAYING 1, STOP TALKING IMMEDIATELY.** - Do not say "zero". Do not say "click". Do not say "time's up".
-   - Just stop outputting text. The system will handle the rest.
-
-3. **THE AFTERMATH:**
-   - Wait for the system to tell you the photo is taken.
-   - Once confirmed, LAUGH maniacally and mock the user about the photo.
-"""
 
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
@@ -126,13 +152,6 @@ CHUNK = 2048
 class AppState:
     def __init__(self):
         self.ai_is_speaking = False
-        self.photo_taken = False 
-
-def take_image():
-    print("\n" + "*"*40, flush=True)
-    print("📸 📸 SNAP! CAMERA FLASH FIRED! 📸 📸", flush=True)
-    print("*"*40 + "\n", flush=True)
-    return "Image captured successfully."
 
 async def play_initial_alarm(stream):
     print("⏰ ALARM TRIGGERED!", flush=True)
@@ -152,7 +171,7 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
         print("✅ Connected!", flush=True)
         
         # Initial trigger
-        await session.send(input="Start the alarm insults and the countdown now!", end_of_turn=True)
+        await session.send(input="Start the alarm now!", end_of_turn=True)
         
         async def send_audio():
             try:
@@ -178,32 +197,40 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
                                     app_state.ai_is_speaking = True
                                     await asyncio.to_thread(speaker_stream.write, part.inline_data.data)
 
-                        # 2. Handle Turn Completion (The Logic Gate)
+                        # 2. Handle Tool Calls
+                        if server_content.tool_call:
+                            print("\n⚙️ Tool Call Received!", flush=True)
+                            for call in server_content.tool_call.function_calls:
+                                name = call.name
+                                print(f"   -> Executing: {name}()")
+                                
+                                if name in tools_map:
+                                    # Execute the tool
+                                    result = tools_map[name]()
+                                    
+                                    # Send response back to model
+                                    await session.send(
+                                        input=types.LiveClientToolResponse(
+                                            function_responses=[
+                                                types.FunctionResponse(
+                                                    name=name,
+                                                    id=call.id,
+                                                    response={"result": result}
+                                                )
+                                            ]
+                                        )
+                                    )
+                                else:
+                                    print(f"   [ERROR] Unknown tool: {name}")
+
+                        # 3. Handle Turn Completion
                         if server_content.turn_complete:
                             app_state.ai_is_speaking = False
                             
-                            # If we haven't taken the photo yet, do it now
-                            if not app_state.photo_taken:
-                                print("\n🤐 Countdown complete.", flush=True)
-                                
-                                # A. Take Photo
-                                take_image()
-                                app_state.photo_taken = True
-                                
-                                # B. Read History LOCALLY
-                                history_text = fetch_history()
-                                print(f"   (Reading history file... Found: '{history_text[:20]}...')", flush=True)
-
-                                # C. Send it all to the AI in one prompt
-                                roast_prompt = (
-                                    "SYSTEM: Photo taken successfully. "
-                                    f"I also scanned their browser history: '{history_text}'. "
-                                    "Now LAUGH at them and roast them about this specific history!"
-                                )
-                                
-                                await session.send(input=roast_prompt, end_of_turn=True)
-
             except asyncio.CancelledError: pass
+            except Exception as e:
+                print(f"Error in receive_audio: {e}")
+                traceback.print_exc()
             finally: app_state.ai_is_speaking = False
 
         send_task = asyncio.create_task(send_audio())
@@ -224,10 +251,13 @@ async def main():
 
     await play_initial_alarm(speaker_stream)
     
-    # Simplified config - NO TOOLS
+    system_instruction_text = get_system_instruction()
+    # print(f"Loaded System Instruction ({len(system_instruction_text)} chars)")
+
     config = {
         "response_modalities": ["AUDIO"],
-        "system_instruction": types.Content(parts=[types.Part(text=SYSTEM_INSTRUCTION)]),
+        "system_instruction": types.Content(parts=[types.Part(text=system_instruction_text)]),
+        "tools": tools_definitions,
     }
 
     while True:
@@ -237,7 +267,19 @@ async def main():
             print(f"Error: {e}")
             await asyncio.sleep(1)
         except KeyboardInterrupt:
+            print("\nShutting down...")
             break
+        finally:
+             if 'mic_stream' in locals():
+                mic_stream.stop_stream()
+                mic_stream.close()
+             if 'speaker_stream' in locals():
+                speaker_stream.stop_stream()
+                speaker_stream.close()
+             p.terminate()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
