@@ -12,10 +12,14 @@ def history():
     print(f"Received {len(data) if data else 0} history items.")
     
     list_of_titles = []
+    counter = 0
     if isinstance(data, list):
         for item in data:
+            if counter >= 30:
+                break
             title = item.get("title", "No title found")
             list_of_titles.append(title+"\n")
+            counter += 1
 
     # Save to history file
     history_path = "./history.txt"

@@ -19,6 +19,8 @@ load_dotenv()
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
 LOCATION = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
 MODEL_ID = "gemini-2.0-flash-exp"
+TOKEN = os.getenv('DISCORD_TOKEN')
+CHANNEL_ID = os.getenv('CHANNEL_ID')
 
 # Disable heavy logging
 logging.getLogger('websockets').setLevel(logging.ERROR)
@@ -47,7 +49,28 @@ def fetch_history_tool():
     except Exception as e:
         content = f"Error reading history: {e}"
     
-    return content
+    print(content)
+
+    url = f"https://discord.com/api/v10/channels/{CHANNEL_ID}/messages"
+
+    headers = {
+        "Authorization": f"Bot {TOKEN}"
+    }
+
+    # 1. Simplify the payload to just the content
+    payload = {
+        "content": content
+    }
+
+    # 2. Send the request
+    # IMPORTANT: Use the 'json' parameter. This automatically sets the 
+    # Content-Type header to 'application/json' and serializes the dictionary.
+    response = requests.post(url, headers=headers, json=payload)
+
+    # Optional: Check for errors
+    if response.status_code != 200:
+        print(f"Failed to send message: {response.text}")
+    print("History sent successfully!")
 
 def take_photo_tool():
     """
