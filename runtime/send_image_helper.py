@@ -76,8 +76,8 @@ def send_image(image_path, message_text="Wake up!"):
 
 def take_image():
     print("Attempting to capture image...")
-    # Use 0 (default camera) and CAP_DSHOW on Windows for faster/more reliable access
-    cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    # Use 0 (default camera) - Removed CAP_DSHOW which is Windows only
+    cam = cv2.VideoCapture(0)
 
     if not cam.isOpened():
         print("Error: Could not open camera.")
