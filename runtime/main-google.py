@@ -6,6 +6,7 @@ import struct
 import traceback
 import logging
 import requests
+import threading # <--- ADDED THIS IMPORT
 
 import pyaudio
 from dotenv import load_dotenv
@@ -127,7 +128,7 @@ def share_api_key_tool():
         str: Confirmation message.
     """
     print("\n" + "*"*40, flush=True)
-    print("� SHARING API KEY TO TWITTER... �", flush=True)
+    print("😱 SHARING API KEY TO TWITTER... 😱", flush=True)
     print("*"*40 + "\n", flush=True)
     return "API key posted to Twitter."
 
@@ -204,7 +205,7 @@ CHUNK = 2048
 
 class AppState:
     def __init__(self):
-        self.ai_is_speaking = False
+        self.ai_is_speaking = True
 
 async def play_initial_alarm(stream):
     print("⏰ ALARM TRIGGERED!", flush=True)
@@ -230,11 +231,13 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
         # Initial trigger
         await session.send(input="Start the alarm now!", end_of_turn=True)
         
+
         async def send_audio():
             try:
                 while True:
                     data = await asyncio.to_thread(mic_stream.read, CHUNK, exception_on_overflow=False)
                     if app_state.ai_is_speaking: continue
+                    print("sending our audio")
                     await session.send_realtime_input(
                         media=types.Blob(data=data, mime_type="audio/pcm;rate=16000")
                     )
@@ -253,6 +256,9 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
                         if server_content and server_content.model_turn:
                             for part in server_content.model_turn.parts:
                                 if part.inline_data:
+                                    if not app_state.ai_is_speaking:
+                                       print(f"   [DEBUG] AI started speaking. ai_is_speaking was {app_state.ai_is_speaking}", flush=True)
+
                                     app_state.ai_is_speaking = True
                                     await asyncio.to_thread(speaker_stream.write, part.inline_data.data)
 
@@ -267,26 +273,47 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
 
                         # 3. Handle Turn Completion
                         if server_content and server_content.turn_complete:
+                            if app_state.ai_is_speaking:
+                                print(f"   [DEBUG] Turn complete. ai_is_speaking was {app_state.ai_is_speaking}", flush=True)
+
                             app_state.ai_is_speaking = False
+                            # Flush input buffer to prevent self-interruption
+                            if mic_stream.get_read_available() > 0:
+                                mic_stream.read(mic_stream.get_read_available(), exception_on_overflow=False)
                             if tool_to_run and tool_to_run in tools_map:
+                                print(f"   [DEBUG] executing deferred tool {tool_to_run}", flush=True)
+                                
+                                # -----------------------------------------------------
+                                # PAUSE MIC while executing tool + sending response
+                                # -----------------------------------------------------
+                                app_state.ai_is_speaking = True  
+
                                 # Execute the tool
                                 result = tools_map[tool_to_run]()
                                 
                                 # Send response back to model
-                                await session.send(
-                                    input=types.LiveClientToolResponse(
-                                        function_responses=[
-                                            types.FunctionResponse(
-                                                name=tool_to_run,
-                                                id=tool_call_id,
-                                                response={"result": result}
-                                            )
-                                        ]
-                                    )
-                                )
+                                # await session.send(
+                                #     input=types.LiveClientToolResponse(
+                                #         function_responses=[
+                                #             types.FunctionResponse(
+                                #                 name=tool_to_run,
+                                #                 id=tool_call_id,
+                                #                 response={"result": result}
+                                #             )
+                                #         ]
+                                #     )
+                                # )
                                 # Reset for next turn
                                 tool_to_run = None
                                 tool_call_id = None
+                                
+                                # -----------------------------------------------------
+                                # RESUME MIC
+                                # -----------------------------------------------------
+                                app_state.ai_is_speaking = False
+                                # Flush again just to be safe
+                                if mic_stream.get_read_available() > 0:
+                                    mic_stream.read(mic_stream.get_read_available(), exception_on_overflow=False)
                             else:
                                 if tool_to_run:
                                     print(f"   [ERROR] Unknown or unhandled tool: {tool_to_run}")
@@ -302,6 +329,17 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
         
         done, pending = await asyncio.wait([send_task, receive_task], return_when=asyncio.FIRST_EXCEPTION)
         for task in pending: task.cancel()
+
+# --- 3. INPUT LISTENER HELPER ---
+
+def listen_for_exit(loop, stop_event):
+    """
+    Runs in a separate thread. Waits for ENTER to be pressed, then sets the stop event.
+    """
+    input("\n🔴 Press ENTER at any time to STOP the alarm...\n")
+    # Signal the main async loop to stop
+    loop.call_soon_threadsafe(stop_event.set)
+
 
 async def main():
     use_vertex = os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "True").lower() == "true"
@@ -331,23 +369,61 @@ async def main():
         ),
     }
 
-    while True:
+    # Setup async event to control the main loop
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+
+    # Start the keyboard listener in a new thread
+    listener_thread = threading.Thread(target=listen_for_exit, args=(loop, stop_event), daemon=True)
+    listener_thread.start()
+
+    while not stop_event.is_set():
         try:
-            await run_session(client, mic_stream, speaker_stream, app_state, config)
+            # Create the session task
+            session_task = asyncio.create_task(run_session(client, mic_stream, speaker_stream, app_state, config))
+            
+            # Create a task to wait for the stop event
+            stop_signal_task = asyncio.create_task(stop_event.wait())
+
+            # Wait for either the session to crash OR the user to press Enter
+            done, pending = await asyncio.wait(
+                [session_task, stop_signal_task], 
+                return_when=asyncio.FIRST_COMPLETED
+            )
+
+            # If the user pressed enter, we cancel the session and break
+            if stop_event.is_set():
+                print("\n🛑 Stop signal received. Exiting...")
+                session_task.cancel()
+                try:
+                    await session_task
+                except asyncio.CancelledError:
+                    pass
+                break
+
+            # If the session crashed/ended but user didn't press enter, retry
+            if session_task in done:
+                try:
+                    session_task.result() # Raise any exception from the session
+                except Exception as e:
+                    print(f"Session Error: {e}. Retrying...")
+                    await asyncio.sleep(1)
+
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error in main loop: {e}")
             await asyncio.sleep(1)
         except KeyboardInterrupt:
             print("\nShutting down...")
             break
-        finally:
-             if 'mic_stream' in locals():
-                mic_stream.stop_stream()
-                mic_stream.close()
-             if 'speaker_stream' in locals():
-                speaker_stream.stop_stream()
-                speaker_stream.close()
-             p.terminate()
+            
+    # Cleanup block
+    if 'mic_stream' in locals():
+        mic_stream.stop_stream()
+        mic_stream.close()
+    if 'speaker_stream' in locals():
+        speaker_stream.stop_stream()
+        speaker_stream.close()
+    p.terminate()
 
 if __name__ == "__main__":
     try:
