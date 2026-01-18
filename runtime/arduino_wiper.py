@@ -5,7 +5,7 @@ import asyncio
 
 # Configure this to match your Arduino's serial port
 # On Linux, it's often /dev/ttyUSB0 or /dev/ttyACM0
-SERIAL_PORT = '/dev/ttyACM0'
+SERIAL_PORT = '/dev/ttyACM1'
 BAUD_RATE = 9600
 
 def get_serial_connection(port=SERIAL_PORT, baud=BAUD_RATE):
