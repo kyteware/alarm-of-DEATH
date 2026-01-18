@@ -5,6 +5,7 @@ import math
 import struct
 import traceback
 import logging
+import requests
 
 import pyaudio
 from dotenv import load_dotenv
@@ -24,7 +25,7 @@ logging.getLogger('asyncio').setLevel(logging.ERROR)
 
 # --- 1. TOOLS (Called by the Model) ---
 
-def fetch_history_tool():
+async def fetch_history_tool():
     """
     Reads the user's latest browser history from a text file to roast them.
     Returns:
@@ -36,7 +37,7 @@ def fetch_history_tool():
 
     file_path = "./history.txt" 
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with await open(file_path, "r", encoding="utf-8") as f:
             content = f.read().strip()
             if not content:
                 content = "History is empty (boring user)."
@@ -47,7 +48,7 @@ def fetch_history_tool():
     
     return content
 
-def take_photo_tool():
+async def take_photo_tool():
     """
     Takes a photo of the user using the webcam to threaten them with.
     Returns:
@@ -56,6 +57,19 @@ def take_photo_tool():
     print("\n" + "*"*40, flush=True)
     print("📸 📸 SNAP! CAMERA FLASH FIRED! 📸 📸", flush=True)
     print("*"*40 + "\n", flush=True)
+    
+    print("Firing Camera Trigger...")
+    try:
+        # Notice Port 5001 for Camera Server
+        response = await requests.post("http://localhost:5001/fire")
+        if response.status_code == 200:
+            print("Trigger fired successfully! Monitor (send_image.py) should wake up soon.")
+        else:
+            print(f"Failed to fire trigger. Status: {response.status_code}")
+    except Exception as e:
+        print(f"Error connecting to server: {e}")
+        print("Is server.py running on port 5001?")
+
     return "Image captured successfully. User looks terrified."
 
 def knock_shelf_tool():
@@ -264,6 +278,28 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
         done, pending = await asyncio.wait([send_task, receive_task], return_when=asyncio.FIRST_EXCEPTION)
         for task in pending: task.cancel()
 
+# async def start_background_services():
+#     print("Starting Background Services", flush=True)
+#     # Start the Server (Port 5001)
+#     await asyncio.create_subprocess_exec(
+#         sys.executable, "../Scripts/server.py",
+#         stdout=asyncio.subprocess.DEVNULL, # Keep console clean
+#         stderr=asyncio.subprocess.PIPE
+#     )
+#     # Start the Monitor (Eye)
+#     await asyncio.create_subprocess_exec(
+#         sys.executable, "../Scripts/send_image_helper.py",
+#         stdout=asyncio.subprocess.DEVNULL,
+#         stderr=asyncio.subprocess.PIPE
+#     )
+
+#     await asyncio.create_subprocess_exec(
+#         sys.executable, "../Scripts/read_history_text.py",
+#         stdout=asyncio.subprocess.DEVNULL,
+#         stderr=asyncio.subprocess.PIPE
+#     )
+#     print("Background Services are running (Server + Monitor)", flush=True)
+
 async def main():
     use_vertex = os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "True").lower() == "true"
     client = genai.Client(vertexai=use_vertex, project=PROJECT_ID, location=LOCATION)
@@ -309,6 +345,11 @@ async def main():
                 speaker_stream.stop_stream()
                 speaker_stream.close()
              p.terminate()
+
+# async def main():
+#     # await start_background_services()
+#     # await asyncio.sleep(1)
+#     print(await fetch_history_tool())
 
 if __name__ == "__main__":
     try:

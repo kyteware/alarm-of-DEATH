@@ -6,3 +6,8 @@ flask
 requests
 opencv-python
 pynacl
+os
+random
+json
+time
+cv2
