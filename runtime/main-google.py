@@ -10,6 +10,7 @@ import pyaudio
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from strobe_controller import turn_on_for_3_seconds_async
 
 load_dotenv()
 
@@ -76,6 +77,7 @@ def turn_on_strobe_tool():
     """
     print("\n" + "*"*40, flush=True)
     print("🚨 STROBE LIGHT ACTIVATED! 🚨", flush=True)
+    turn_on_for_3_seconds_async()
     print("*"*40 + "\n", flush=True)
     return "Strobe light is now ON."
 
