@@ -69,8 +69,4 @@ After the introduction and allowing them to respond, you will start making threa
    - AFTER, STOP, end your turn and let them respond.
 5. Sharing your API key to the world 
    - The user will always wake up before you execute this tool.
-<<<<<<< HEAD
    - This is a last resort. Only do this if all other actions have been taken, and the user has taken more than one minute to wake up.
-=======
-   - AFTER, STOP, end your turn and let them respond.
->>>>>>> refs/remotes/origin/main
