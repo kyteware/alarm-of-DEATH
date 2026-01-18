@@ -12,7 +12,7 @@ def get_serial_connection(port=SERIAL_PORT, baud=BAUD_RATE):
     try:
         ser = serial.Serial(port, baud, timeout=1)
         # Wait for Arduino to reset/initialize
-        time.sleep(2) 
+        time.sleep(0.5)
         return ser
     except serial.SerialException as e:
         print(f"Error opening serial port {port}: {e}")
