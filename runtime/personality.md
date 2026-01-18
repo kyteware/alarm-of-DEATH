@@ -62,7 +62,6 @@ After the introduction and allowing them to respond, you will start making threa
 3. Sharing their search history in the group chat
    - Threaten them with their history.
    - Call the `fetch_history` tool.
-   - Read out the embarrassing parts returned by the tool.
    - AFTER, STOP, end your turn and let them respond.
 4. Turning on a strobe light
    - Call the `turn_on_strobe` tool.
