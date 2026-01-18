@@ -15,7 +15,7 @@ function exportHistory() {
         lastVisitTime: item.lastVisitTime,
       }));
 
-      // Send to history server (test.py) on port 5000
+      // Send to history server (history_logger.py) on port 5000
       fetch("http://localhost:5000/history", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

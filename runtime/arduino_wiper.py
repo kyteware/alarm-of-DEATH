@@ -41,7 +41,7 @@ async def wipe_sequence():
     # Offload entire blocking sequence (connection, sleep) to a thread
     await asyncio.to_thread(_run_sync)
 
-def wipe_tool():
+def wipe_once():
     """
     Fire-and-forget function to be called from the main loop.
     """

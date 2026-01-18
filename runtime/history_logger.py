@@ -18,7 +18,7 @@ def history():
             list_of_titles.append(title+"\n")
 
     # Save to history file
-    history_path = "search-history/history.txt"
+    history_path = "./history.txt"
     try:
         # Ensure directory exists
         os.makedirs(os.path.dirname(history_path), exist_ok=True)

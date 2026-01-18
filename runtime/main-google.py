@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from strobe_controller import turn_on_for_3_seconds_async
+from arduino_wiper import wipe_once
 
 load_dotenv()
 
@@ -81,6 +82,7 @@ def knock_shelf_tool():
     """
     print("\n" + "*"*40, flush=True)
     print("💥 CRASH! SOMETHING FELL OFF THE SHELF! 💥", flush=True)
+    wipe_once()
     print("*"*40 + "\n", flush=True)
     return "Knocked item off shelf."
 
