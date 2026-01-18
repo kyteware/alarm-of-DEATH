@@ -21,11 +21,13 @@ def get_serial_connection(port=SERIAL_PORT, baud=BAUD_RATE):
 def turn_on(ser):
     if ser and ser.is_open:
         ser.write(b'1')
+        ser.flush()
         print("Strobe ON")
 
 def turn_off(ser):
     if ser and ser.is_open:
         ser.write(b'0')
+        ser.flush()
         print("Strobe OFF")
 
 async def strobe_sequence():
@@ -43,6 +45,7 @@ async def strobe_sequence():
             # so checking for 3 seconds of ON time.
             time.sleep(3)
             turn_off(ser)
+            time.sleep(0.5) # Wait a bit to ensure command reaches Arduino before closing
             ser.close()
             print("🔌 Strobe sequence complete.")
         else:
