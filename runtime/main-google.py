@@ -297,6 +297,13 @@ async def main():
         "response_modalities": ["AUDIO"],
         "system_instruction": types.Content(parts=[types.Part(text=system_instruction_text)]),
         "tools": tools_definitions,
+        "speech_config": types.SpeechConfig(
+            voice_config=types.VoiceConfig(
+                prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                    voice_name="Fenrir"  # Change this to your preferred voice
+                )
+            )
+        ),
     }
 
     while True:
