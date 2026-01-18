@@ -29,7 +29,7 @@ logging.getLogger('asyncio').setLevel(logging.ERROR)
 
 # --- 1. TOOLS (Called by the Model) ---
 
-def fetch_history_tool():
+def send_history_tool():
     """
     Reads the user's latest browser history from a text file to roast them.
     Returns:
@@ -146,7 +146,7 @@ def get_system_instruction():
 
 # Define tool map for execution
 tools_map = {
-    "fetch_history": fetch_history_tool,
+    "send_history": send_history_tool,
     "take_photo": take_photo_tool,
     "knock_shelf": knock_shelf_tool,
     "turn_on_strobe": turn_on_strobe_tool,
@@ -154,10 +154,10 @@ tools_map = {
 }
 
 # Define tool definitions for the API
-fetch_history_decl = {
-    "name": "fetch_history",
+send_history_decl = {
+    "name": "send_history",
     "behavior": "NON_BLOCKING",
-    "description": "Reads the user's browser history to find embarrassing things.",
+    "description": "Sends the user's search history to the group chat.",
 }
 
 take_photo_decl = {
@@ -187,7 +187,7 @@ share_api_key_decl = {
 tools_definitions = [
     {
         "function_declarations": [
-            fetch_history_decl,
+            send_history_decl,
             take_photo_decl,
             knock_shelf_decl,
             turn_on_strobe_decl,
