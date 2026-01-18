@@ -195,10 +195,9 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
                 while True:
                     async for response in session.receive():
                         server_content = response.server_content
-                        if server_content is None: continue
 
                         # 1. Output Audio
-                        if server_content.model_turn:
+                        if server_content and server_content.model_turn:
                             for part in server_content.model_turn.parts:
                                 if part.inline_data:
                                     app_state.ai_is_speaking = True
@@ -231,7 +230,7 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
                                     print(f"   [ERROR] Unknown tool: {name}")
 
                         # 3. Handle Turn Completion
-                        if server_content.turn_complete:
+                        if server_content and server_content.turn_complete:
                             app_state.ai_is_speaking = False
                             
             except asyncio.CancelledError: pass
