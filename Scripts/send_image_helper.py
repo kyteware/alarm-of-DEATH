@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import cv2
 
 # Load environment variables
-load_dotenv(dotenv_path='.env')
+load_dotenv()
 
 TOKEN = os.getenv('DISCORD_TOKEN')
 CHANNEL_ID = os.getenv('CHANNEL_ID')
