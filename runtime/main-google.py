@@ -10,6 +10,7 @@ import pyaudio
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from strobe_controller import turn_on_for_3_seconds_async
 
 load_dotenv()
 
@@ -76,6 +77,7 @@ def turn_on_strobe_tool():
     """
     print("\n" + "*"*40, flush=True)
     print("🚨 STROBE LIGHT ACTIVATED! 🚨", flush=True)
+    turn_on_for_3_seconds_async()
     print("*"*40 + "\n", flush=True)
     return "Strobe light is now ON."
 
@@ -168,13 +170,15 @@ class AppState:
 async def play_initial_alarm(stream):
     print("⏰ ALARM TRIGGERED!", flush=True)
     frequency = 800
-    for _ in range(3):
-        audio_data = bytearray()
-        for x in range(int(OUTPUT_RATE * 0.15)):
-            sample = 0.2 * 32767.0 * math.sin(2.0 * math.pi * frequency * x / OUTPUT_RATE)
-            audio_data.extend(struct.pack('<h', int(sample)))
-        await asyncio.to_thread(stream.write, bytes(audio_data))
-        await asyncio.to_thread(stream.write, b'\x00' * len(audio_data))
+    for i in range(3):
+        for j in range(4):
+            audio_data = bytearray()
+            for x in range(int(OUTPUT_RATE * 0.15)):
+                sample = 0.2 * 32767.0 * math.sin(2.0 * math.pi * frequency * x / OUTPUT_RATE)
+                audio_data.extend(struct.pack('<h', int(sample)))
+            await asyncio.to_thread(stream.write, bytes(audio_data))
+            await asyncio.to_thread(stream.write, b'\x00' * len(audio_data))
+        await asyncio.sleep(0.5)
 
 tool_to_run = "NONE"
 
