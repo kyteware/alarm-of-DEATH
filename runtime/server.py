@@ -18,29 +18,29 @@ PUBLIC_KEY = os.getenv('PUBLIC_KEY')
 if not PUBLIC_KEY:
     print("WARNING: PUBLIC_KEY not found in .env. Discord interactions will fail verification.")
 else:
-    from nacl.signing import VerifyKey
-    from nacl.exceptions import BadSignatureError
+    # from nacl.signing import VerifyKey
+    # from nacl.exceptions import BadSignatureError
     print("Public Key loaded.")
 
 # --- Helper Functions ---
-def verify_discord_request(req):
-    signature = req.headers.get('X-Signature-Ed25519')
-    timestamp = req.headers.get('X-Signature-Timestamp')
+# def verify_discord_request(req):
+#     signature = req.headers.get('X-Signature-Ed25519')
+#     timestamp = req.headers.get('X-Signature-Timestamp')
     
-    if not signature or not timestamp:
-        print("Missing signature headers")
-        return False
+#     if not signature or not timestamp:
+#         print("Missing signature headers")
+#         return False
         
-    try:
-        verify_key = VerifyKey(bytes.fromhex(PUBLIC_KEY))
-        verify_key.verify(f'{timestamp}{req.data.decode("utf-8")}'.encode(), bytes.fromhex(signature))
-        return True
-    except BadSignatureError:
-        print("Bad signature")
-        return False
-    except Exception as e:
-        print(f"Verification error: {e}")
-        return False
+#     try:
+#         verify_key = VerifyKey(bytes.fromhex(PUBLIC_KEY))
+#         verify_key.verify(f'{timestamp}{req.data.decode("utf-8")}'.encode(), bytes.fromhex(signature))
+#         return True
+#     except BadSignatureError:
+#         print("Bad signature")
+#         return False
+#     except Exception as e:
+#         print(f"Verification error: {e}")
+#         return False
 
 # --- Routes ---
 
@@ -67,8 +67,8 @@ def reset():
 
 @app.route("/interactions", methods=["POST"])
 def interactions():
-    if not verify_discord_request(request):
-        abort(401, 'invalid request signature')
+    # if not verify_discord_request(request):
+    #     abort(401, 'invalid request signature')
 
     data = request.json
     type_ = data.get('type')
