@@ -10,8 +10,11 @@ void setup() {
 }
 
 void loop() {
-  servo.write(0);
-  delay(delayTime);
-  servo.write(90);
-  delay(delayTime);
+  for (int i = 0; i < 2; i++) {
+    servo.write(90);
+    delay(delayTime/2);
+    servo.write(0);
+    delay(delayTime);
+  }
+  exit(0);
 }
