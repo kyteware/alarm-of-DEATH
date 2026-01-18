@@ -1,6 +1,7 @@
 import serial
 import time
 import sys
+import asyncio
 
 # Configure this to match your Arduino's serial port
 # On Linux, it's often /dev/ttyUSB0 or /dev/ttyACM0
@@ -27,27 +28,41 @@ def turn_off(ser):
         ser.write(b'0')
         print("Strobe OFF")
 
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        port = sys.argv[1]
-    else:
-        port = SERIAL_PORT
-        
-    print(f"Connecting to {port}...")
-    ser = get_serial_connection(port)
-    
-    if ser:
-        try:
-            while True:
-                cmd = input("Enter '1' to ON, '0' to OFF, 'q' to quit: ").strip()
-                if cmd == '1':
-                    turn_on(ser)
-                elif cmd == '0':
-                    turn_off(ser)
-                elif cmd.lower() == 'q':
-                    break
-        except KeyboardInterrupt:
-            pass
-        finally:
+async def strobe_sequence():
+    """
+    Async function that handles the full lifecycle:
+    Connect -> On -> Wait 3s -> Off -> Close
+    Runs in a thread to avoid blocking the event loop during sleep/connect.
+    """
+    def _run_sync():
+        print(f"🔌 Connecting to strobe at {SERIAL_PORT}...")
+        ser = get_serial_connection()
+        if ser:
+            turn_on(ser)
+            # We use time.sleep here because we are inside to_thread (worker thread)
+            # so checking for 3 seconds of ON time.
+            time.sleep(3)
+            turn_off(ser)
             ser.close()
-            print("\nConnection closed.")
+            print("🔌 Strobe sequence complete.")
+        else:
+            print("❌ Failed to connect to strobe.")
+
+    # Offload the entire blocking sequence (connection + sleep) to a thread
+    await asyncio.to_thread(_run_sync)
+
+def turn_on_for_3_seconds_async():
+    """
+    Fire-and-forget function to be called from the main loop.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(strobe_sequence())
+        print("🚀 Strobe task scheduled!")
+    except RuntimeError:
+        print("❌ No running event loop to schedule strobe task!")
+
+if __name__ == "__main__":
+    # Test the async function
+    print("Testing strobe sequence...")
+    asyncio.run(strobe_sequence())
