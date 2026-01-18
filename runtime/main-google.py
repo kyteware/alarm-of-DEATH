@@ -198,6 +198,7 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
 
                         # 1. Output Audio
                         if server_content and server_content.model_turn:
+                            print("\nAI speech received", flush=True)
                             for part in server_content.model_turn.parts:
                                 if part.inline_data:
                                     app_state.ai_is_speaking = True
