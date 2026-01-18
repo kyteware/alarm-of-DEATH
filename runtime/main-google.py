@@ -128,26 +128,31 @@ tools_map = {
 # Define tool definitions for the API
 fetch_history_decl = {
     "name": "fetch_history",
+    "behavior": "NON_BLOCKING",
     "description": "Reads the user's browser history to find embarrassing things.",
 }
 
 take_photo_decl = {
     "name": "take_photo",
+    "behavior": "NON_BLOCKING",
     "description": "Takes a photo of the user to threaten posting it online.",
 }
 
 knock_shelf_decl = {
     "name": "knock_shelf",
+    "behavior": "NON_BLOCKING",
     "description": "Knocks an item off the user's shelf to make noise.",
 }
 
 turn_on_strobe_decl = {
     "name": "turn_on_strobe",
+    "behavior": "NON_BLOCKING",
     "description": "Turns on a blinding strobe light.",
 }
 
 share_api_key_decl = {
     "name": "share_api_key",
+    "behavior": "NON_BLOCKING",
     "description": "Posts the API key to the public internet.",
 }
 
@@ -177,13 +182,17 @@ class AppState:
 async def play_initial_alarm(stream):
     print("⏰ ALARM TRIGGERED!", flush=True)
     frequency = 800
-    for _ in range(3):
-        audio_data = bytearray()
-        for x in range(int(OUTPUT_RATE * 0.15)):
-            sample = 0.2 * 32767.0 * math.sin(2.0 * math.pi * frequency * x / OUTPUT_RATE)
-            audio_data.extend(struct.pack('<h', int(sample)))
-        await asyncio.to_thread(stream.write, bytes(audio_data))
-        await asyncio.to_thread(stream.write, b'\x00' * len(audio_data))
+    for i in range(3):
+        for j in range(4):
+            audio_data = bytearray()
+            for x in range(int(OUTPUT_RATE * 0.15)):
+                sample = 0.2 * 32767.0 * math.sin(2.0 * math.pi * frequency * x / OUTPUT_RATE)
+                audio_data.extend(struct.pack('<h', int(sample)))
+            await asyncio.to_thread(stream.write, bytes(audio_data))
+            await asyncio.to_thread(stream.write, b'\x00' * len(audio_data))
+        await asyncio.sleep(0.5)
+
+tool_to_run = "NONE"
 
 async def run_session(client, mic_stream, speaker_stream, app_state, config):
     print("\n⚡ Connecting to Gemini...", flush=True)
@@ -205,6 +214,9 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
             except asyncio.CancelledError: pass
 
         async def receive_audio():
+            tool_to_run = None
+            tool_call_id = None
+
             try:
                 while True:
                     async for response in session.receive():
@@ -212,7 +224,6 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
 
                         # 1. Output Audio
                         if server_content and server_content.model_turn:
-                            print("\nAI speech received", flush=True)
                             for part in server_content.model_turn.parts:
                                 if part.inline_data:
                                     app_state.ai_is_speaking = True
@@ -224,29 +235,34 @@ async def run_session(client, mic_stream, speaker_stream, app_state, config):
                             for call in response.tool_call.function_calls:
                                 name = call.name
                                 print(f"   -> Executing: {name}()")
-                                
-                                if name in tools_map:
-                                    # Execute the tool
-                                    result = tools_map[name]()
-                                    
-                                    # Send response back to model
-                                    await session.send(
-                                        input=types.LiveClientToolResponse(
-                                            function_responses=[
-                                                types.FunctionResponse(
-                                                    name=name,
-                                                    id=call.id,
-                                                    response={"result": result}
-                                                )
-                                            ]
-                                        )
-                                    )
-                                else:
-                                    print(f"   [ERROR] Unknown tool: {name}")
+                                tool_to_run = name
+                                tool_call_id = call.id
 
                         # 3. Handle Turn Completion
                         if server_content and server_content.turn_complete:
                             app_state.ai_is_speaking = False
+                            if tool_to_run and tool_to_run in tools_map:
+                                # Execute the tool
+                                result = tools_map[tool_to_run]()
+                                
+                                # Send response back to model
+                                await session.send(
+                                    input=types.LiveClientToolResponse(
+                                        function_responses=[
+                                            types.FunctionResponse(
+                                                name=tool_to_run,
+                                                id=tool_call_id,
+                                                response={"result": result}
+                                            )
+                                        ]
+                                    )
+                                )
+                                # Reset for next turn
+                                tool_to_run = None
+                                tool_call_id = None
+                            else:
+                                if tool_to_run:
+                                    print(f"   [ERROR] Unknown or unhandled tool: {tool_to_run}")
                             
             except asyncio.CancelledError: pass
             except Exception as e:
