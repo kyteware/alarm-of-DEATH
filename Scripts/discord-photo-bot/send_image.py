@@ -103,15 +103,49 @@ def take_image():
     cam.release()
     cv2.destroyAllWindows()
 
+import time
+
+def check_trigger():
+    try:
+        response = requests.get("http://localhost:5000/trigger")
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("run", False)
+    except Exception as e:
+        print(f"Error checking trigger: {e}")
+    return False
+
+def reset_trigger():
+    try:
+        requests.post("http://localhost:5000/reset")
+    except Exception as e:
+        print(f"Error resetting trigger: {e}")
+
 if __name__ == "__main__":
-    # Example usage
-    take_image()
+    print("📸 Discord Photo Bot Service Started")
+    print("Waiting for trigger from server...")
+    
+    while True:
+        if check_trigger():
+            print("Trigger received! Taking photo...")
+            
+            # Take and save photo
+            take_image()
 
-    # Select one message randomly from the list
-    random_message = random.choice(wake_up_messages)
+            # Select random message
+            random_message = random.choice(wake_up_messages)
+            image_path = "captured_image.png" 
 
-    image_path = "captured_image.png" 
-    send_image(image_path, random_message)
+            # Send to Discord
+            send_image(image_path, random_message)
+            
+            # Reset the trigger so we don't loop forever
+            reset_trigger()
+            
+            print("Detailed cycle complete. Waiting for next trigger...")
+        
+        # Sleep to avoid hammering the server
+        time.sleep(2)
 
 
 
