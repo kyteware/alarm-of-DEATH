@@ -4,5 +4,5 @@ python-dotenv
 pyserial
 flask
 requests
-opencv
+opencv-python
 pynacl
