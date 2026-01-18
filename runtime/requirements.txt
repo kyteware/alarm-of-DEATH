@@ -5,8 +5,3 @@ pyserial
 flask
 requests
 opencv-python
-os
-random
-json
-time
-cv2
