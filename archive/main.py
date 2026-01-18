@@ -14,8 +14,7 @@ def main():
     # Now fetch it securely
     AGENT_ID = os.getenv("ELEVENLABS_AGENT_ID")
 
-    # AGENT_ID is saved as a constant in file `key.py` with constant `AGENT_ID`
-    # AGENT_ID=os.environ.get('AGENT_ID')
+    # AGENT_ID is saved as a constant in file `.env` with constant `ELEVENLABS_AGENT_ID`
     API_KEY=os.environ.get('ELEVENLABS_API_KEY')
 
     if not AGENT_ID:
