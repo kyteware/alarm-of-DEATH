@@ -27,17 +27,17 @@ If we were given more time to work on Angry Alarm, we would make Angry Alarm mor
 
 ## ROADMAP
 
-- [ ] Make conversation AI (cedric & ryan if needed)
-    - [ ] Fix bug
-    - [ ] Add tool calls for punishments
-    - [ ] Make evil (voice and manner of speech)
-- [ ] Make table knocker (daniel)
-    - [ ] Figure out setting up quick in the demo
-    - [ ] Hook up so it can be activated by computer
-    - [ ] Merge strobing + wiping into one arduino
-- [ ] Make strobe light (ryan)
-    - [ ] Who even knows how the hell this will work
-- [ ] Make software punishments (ethan)
+- [x] Make conversation AI (cedric & ryan if needed)
+    - [x] Fix bug
+    - [x] Add tool calls for punishments
+    - [x] Make evil (voice and manner of speech)
+- [x] Make table knocker (daniel)
+    - [x] Figure out setting up quick in the demo
+    - [x] Hook up so it can be activated by computer
+    - [x] Merge strobing + wiping into one arduino
+- [x] Make strobe light (ryan)
+    - [x] Who even knows how the hell this will work
+- [x] Make software punishments (ethan)
     - [x] Chrome extension
-    - [ ] Discord bot
-    - [ ] Taking picture
+    - [x] Discord bot
+    - [x] Taking picture
